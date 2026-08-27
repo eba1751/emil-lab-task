@@ -21,5 +21,9 @@ Different approaches exist from which file we want to install packages. Best app
 
 ### 4. One thing you would improve or add given more time
 
+Possible improvements:
+Using a tool like Ansible wich is exactly for SSH based tasks can result in more modern and clrarer implementation.
+
+With more time:
 SSH hardening section was not implemented because time limitation.
 Also "lab-health.sh" was not implemented.
