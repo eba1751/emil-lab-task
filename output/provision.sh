@@ -48,8 +48,14 @@ if [[ ! -f "$SSH_PUBKEY" ]]; then
   exit 1
 fi
 PUBKEY_CONTENT=$(cat "$SSH_PUBKEY")
+PRIVKEY="${SSH_PUBKEY%.pub}"   # strips ".pub" to get the matching private key path
 
-SSH_OPTS=(-o StrictHostKeyChecking=no -p "$TARGET_PORT")
+if [[ ! -f "$PRIVKEY" ]]; then
+  echo "ERROR: private key not found at $PRIVKEY"
+  exit 1
+fi
+
+SSH_OPTS=(-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p "$TARGET_PORT" -i "$PRIVKEY")
 
 echo "==> Target reached via ${JUMP1_INTERNAL_HOST:-direct} @ ${JUMPHOST_IP:-n/a}:${JUMPHOST_PORT:-n/a} -> ${TARGET_IP}:${TARGET_PORT}"
 
@@ -90,14 +96,14 @@ if ! ssh "${SSH_OPTS[@]}" -o BatchMode=yes -o PasswordAuthentication=no \
 fi
 echo "    Confirmed: $LAB_USER key login works."
 
-echo "==> Step 5: Configure ufw (allow SSH BEFORE enabling, so we don't lock ourselves out)"
+echo "==> Step 5: Configure ufw rules (config-only; enforcement requires NET_ADMIN)"
 ROOT_SSH bash -s <<'EOF'
 set -e
 apt-get install -y ufw
 ufw default deny incoming
 ufw default allow outgoing
 ufw allow 22/tcp
-ufw --force enable
+echo "NOTE: skipping 'ufw enable' — not supported without NET_ADMIN in this container"
 EOF
 
 echo "==> Step 6: Harden SSH (disable password auth + root login)"
@@ -116,7 +122,12 @@ if ! ssh "${SSH_OPTS[@]}" -o BatchMode=yes "$LAB_USER@$TARGET_IP" "echo STILL_OK
   exit 1
 fi
 
-echo "==> Step 8: Set hostname to '$HOSTNAME'"
-ssh "${SSH_OPTS[@]}" "$LAB_USER@$TARGET_IP" "sudo hostnamectl set-hostname $HOSTNAME"
+echo "==> Step 8: Verify hostname matches expected value '$HOSTNAME'"
+ACTUAL_HOSTNAME=$(ssh "${SSH_OPTS[@]}" "$LAB_USER@$TARGET_IP" "hostname")
+if [[ "$ACTUAL_HOSTNAME" == "$HOSTNAME" ]]; then
+  echo "OK: hostname is '$ACTUAL_HOSTNAME'"
+else
+  echo "WARN: hostname is '$ACTUAL_HOSTNAME', expected '$HOSTNAME' — update docker-compose.yml's hostname: field"
+fi
 
 echo "==> Done. $LAB_USER@$TARGET_IP:$TARGET_PORT is provisioned and hardened as '$HOSTNAME'."

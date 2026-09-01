@@ -16,11 +16,14 @@ A library that imitates SSHing to devices under test via a remotely managed lab 
     a. Make provision.sh executable with "chmod a+x provision.sh"
     b. Run it with "./provision.sh config/<your conf file>"
     c. This will install packages on target machine
+5. !!! Submitted after daedline !!! Run "./lab_health.sh" for some basic tests on DUT.
 
 ### 2. How you handled the systemd limitation in Docker
 
 On the jump machine exec /usr/sbin/sshd -D — the exec replaces the shell process with sshd itself, so sshd becomes PID 1
 On the target machine bash (running target-init.sh) is PID 1, with sshd as a child process.
+
+During SSH harfening process "PAM/Docker interaction" was encountered and fixed by commenting it out.
 
 ### 3. Assumptions made
 

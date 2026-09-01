@@ -64,6 +64,7 @@ fi
 echo
 echo "[ Lab User ]"
 # TODO: verify the lab user is correctly set up.
+ssh -o BatchMode=yes -o ConnectTimeout=5 lab-target1 "whoami"
 
 # ── 2. SSH hardening ───────────────────────────────────────────────────────
 
@@ -71,6 +72,10 @@ echo
 echo "[ SSH Hardening ]"
 # TODO: verify the SSH daemon is securely configured.
 # Hint: sshd -T prints the effective runtime config, including values from drop-in files.
+ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ~/.ssh/lab_id_ed25519 \
+    -p 2222 target1@localhost "sudo sshd -T" | grep -Ei \
+  "^(permitrootlogin|passwordauthentication|permitemptypasswords|challengeresponseauthentication|kbdinteractiveauthentication|pubkeyauthentication|x11forwarding|maxauthtries|logingracetime|allowtcpforwarding|permittunnel)\b"
+  
 
 # ── 3. Firewall ────────────────────────────────────────────────────────────
 
@@ -79,18 +84,49 @@ echo "[ Firewall ]"
 # TODO: verify ufw is correctly configured.
 # Note: ufw cannot enforce rules in an unprivileged Docker container (no NET_ADMIN);
 #       consider verifying the config files instead of 'ufw status'.
+ssh lab-target1 "cat /etc/ufw/ufw.conf" | grep -i enabled
+ssh lab-target1 "cat /etc/default/ufw" | grep -Ei "^DEFAULT_(INPUT|OUTPUT|FORWARD)_POLICY"
+
+echo "==> ufw package installed?"
+ssh lab-target1 "dpkg -l | grep -q '^ii.*ufw' && echo OK || echo FAIL"
+
+echo "==> Default input policy (should be DROP/REJECT)"
+ssh lab-target1 "grep '^DEFAULT_INPUT_POLICY' /etc/default/ufw"
+
+echo "==> Default output policy (should be ACCEPT)"
+ssh lab-target1 "grep '^DEFAULT_OUTPUT_POLICY' /etc/default/ufw"
+
+echo "==> Port 22 allow rule present in compiled ruleset?"
+ssh lab-target1 "sudo grep -q 'dport 22' /etc/ufw/user.rules && echo OK || echo FAIL"
 
 # ── 4. Tunnel process ──────────────────────────────────────────────────────
 
 echo
 echo "[ Tunnel Process ]"
 # TODO: check that the reverse tunnel process is running.
+if ssh -i ~/.ssh/lab_id_ed25519 -p 2205 -o BatchMode=yes -o ConnectTimeout=3 \
+      -o StrictHostKeyChecking=no target1@localhost exit 2>/dev/null; then
+  echo "Tunnel is fully functional (end-to-end)"
+else
+  echo "Tunnel check failed"
+fi
+# Used exp;icitly "~/.ssh/lab_id_ed25519"
 
 # ── 5. Tunnel connectivity ─────────────────────────────────────────────────
 
 echo
 echo "[ Tunnel Connectivity ]"
 # TODO: verify the machine is reachable through the jump host on port $JUMPHOST_TUNNEL_PORT.
+HOST="localhost"
+PORT="2205"
+
+echo "Checking reachability of target via jumphost ($HOST:$PORT)..."
+
+if ! nc -z -w3 "$HOST" "$PORT" 2>/dev/null; then
+  echo "FAIL: port $PORT not reachable at all"
+  exit 1
+fi
+echo "OK: port $PORT is open"
 
 # ── 6. Node.js ────────────────────────────────────────────────────────────
 
@@ -108,6 +144,8 @@ fi
 echo
 echo "[ Public IP ]"
 # TODO: fetch the machine's public IP and flag results that look suspicious.
+ssh -o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=5 \
+    lab-target1 "hostname -I"
 
 # ── Summary ────────────────────────────────────────────────────────────────
 

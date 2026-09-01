@@ -44,6 +44,8 @@ set -e
 
 apt-get update
 apt-get install -y openssh-server sshpass
+# To bypass sshd + Docker and pam_loginuid issue (PAM/Docker interaction):
+sed -i 's/^session\s*required\s*pam_loginuid.so/session optional pam_loginuid.so/' /etc/pam.d/sshd 
 
 mkdir -p /run/sshd
 echo "root:targetpass" | chpasswd
